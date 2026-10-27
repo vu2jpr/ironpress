@@ -4,7 +4,7 @@ use super::engine::{
     decode_footnote_link_data, target_anchor_id,
 };
 use super::flow_metrics::BlockMargins;
-use super::fragmentation::split_flow_at_descendant_break;
+use super::fragmentation::{contains_descendant_break, split_flow_at_descendant_break};
 use super::roundoff::{equal_with_roundoff, exceeds_with_roundoff, is_positive_with_roundoff};
 use super::text::{OverflowWrap, TextWrapOptions, wrap_text_runs};
 use crate::layout::elements::{
@@ -1967,8 +1967,7 @@ fn split_container_node(
     // First fragment: the children that fit, with the box's top decoration. Under
     // `slice` drop the bottom border/padding/margin (box stays open at the page
     // bottom); under `clone` keep the full decoration so the fragment closes.
-    let mut first = element.clone();
-    first.children = f_children_vec;
+    let mut first = element.with_children(f_children_vec);
     if !clone {
         first.box_model.margins.end = 0.0;
         first.box_model.padding.bottom = 0.0;
@@ -1992,8 +1991,7 @@ fn split_container_node(
     // Continuation: the remaining children. Under `slice` drop the top
     // margin/border/padding (the open box continues) and keep the bottom so the
     // LAST fragment closes it; under `clone` keep the full decoration.
-    let mut rest = element.clone();
-    rest.children = r_children_vec;
+    let mut rest = element.with_children(r_children_vec);
     rest.box_model.size.height = continuation_size;
     if !clone {
         rest.box_model.margins.start = 0.0;
@@ -2743,6 +2741,12 @@ pub(crate) fn paginate_with_context(
     // before (every existing `continue`/placement is unchanged), so the whole
     // single-page corpus is byte-for-byte identical.
     let mut work = prepare_pagination_work(elements);
+    // Fragments only ever lose descendants, so a document without a nested
+    // forced break never gains one. Probing once spares searching every
+    // remaining box again on each page.
+    let has_descendant_breaks = work
+        .iter()
+        .any(|pending| contains_descendant_break(pending.element.as_ref()));
     while let Some(PendingElement {
         mut element,
         is_fragment_continuation,
@@ -3398,6 +3402,7 @@ pub(crate) fn paginate_with_context(
         // the earlier descendant break inert; after splitting, the ordinary
         // adjacent-break coalescing logic resolves both in document order.
         if elem_position == Position::Static
+            && has_descendant_breaks
             && let Some((first, rest, target)) =
                 split_flow_at_descendant_break(&element, avail_below_box_top)
         {

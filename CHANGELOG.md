@@ -31,6 +31,13 @@
   child into that space. A table caption landing in the last few points of a
   page was clipped at the page edge.
 
+### Performance
+
+- Paginating a box that spans many pages no longer copies its remaining
+  content at every page break, and no longer searches all of it for forced
+  breaks when the document has none. Both made long, deeply nested documents
+  quadratic in their page count.
+
 ### Changed
 
 - Text shaping runs on harfrust and glyph outlines, bounds and advances come
