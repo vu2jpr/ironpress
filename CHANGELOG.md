@@ -10,6 +10,12 @@
   HTML pasted from word processors, lost the rest of the document. Block
   containers, table cells and flex items now break the inline box around the
   block, as they already did at the root.
+- Elements nested more than 30 deep are laid out instead of silently dropped.
+  Element layout grows its stack on the heap as nesting deepens (via
+  `stacker`) and lays out up to 512 levels. Other recursive passes (inline
+  run collection, pagination, rendering) still run on the calling thread's
+  stack, so very deep inline nesting can exhaust a small thread stack (about
+  130 nested `<span>`s on a 2 MB thread).
 
 ### Changed
 

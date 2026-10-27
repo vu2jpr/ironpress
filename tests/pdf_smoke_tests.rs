@@ -589,3 +589,19 @@ fn smoke_block_inside_inline_in_table_cell_and_flex_item() {
     }
 }
 
+// === Deeply nested documents ===
+
+#[test]
+fn smoke_deeply_nested_content_is_laid_out() {
+    // 200 levels: deeper than the default stack would allow without growth,
+    // within the sanitizer's nesting limit.
+    let depth = 200;
+    let html = format!(
+        "{}<p>Deepest text</p>{}<p>After nesting</p>",
+        "<div style=\"padding-left:1px\">".repeat(depth),
+        "</div>".repeat(depth)
+    );
+    let pdf = smoke_html_to_pdf(&html);
+    assert!(pdf_has_text(&pdf, "Deepest text"));
+    assert!(pdf_has_text(&pdf, "After nesting"));
+}
