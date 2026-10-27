@@ -536,3 +536,56 @@ fn smoke_filter_blur_text_element_no_crash() {
     assert!(pdf_has_text(&pdf, "/SMask"));
     assert!(pdf_has_text(&pdf, "Normal text"));
 }
+
+// === Block-level boxes inside inline boxes (CSS 2.1 § 9.2.1.1) ===
+
+#[test]
+fn smoke_block_inside_inline_is_laid_out() {
+    let html =
+        r#"<div>Lead <span>Inline start<div>Nested block</div>Inline end</span></div><p>After</p>"#;
+    let pdf = smoke_html_to_pdf(html);
+    assert!(pdf_is_valid(&pdf));
+    for text in [
+        "Lead",
+        "Inline start",
+        "Nested block",
+        "Inline end",
+        "After",
+    ] {
+        assert!(pdf_has_text(&pdf, text), "missing {text:?}");
+    }
+}
+
+#[test]
+fn smoke_unclosed_inline_keeps_following_blocks() {
+    // The parser keeps an unclosed <span> open, so every later block nests
+    // inside it.
+    let html =
+        r#"<center>Lead <span>Open span<div>First block</div><p>Second block</p><h2>Heading</h2>"#;
+    let pdf = smoke_html_to_pdf(html);
+    for text in ["Open span", "First block", "Second block", "Heading"] {
+        assert!(pdf_has_text(&pdf, text), "missing {text:?}");
+    }
+}
+
+#[test]
+fn smoke_css_block_inside_inline_is_laid_out() {
+    let html = r#"<style>em.block { display: block }</style>
+        <div>Lead <b>Bold<em class="block">Styled block</em>Bold end</b></div>"#;
+    let pdf = smoke_html_to_pdf(html);
+    for text in ["Styled block", "Bold end"] {
+        assert!(pdf_has_text(&pdf, text), "missing {text:?}");
+    }
+}
+
+#[test]
+fn smoke_block_inside_inline_in_table_cell_and_flex_item() {
+    let html = r#"
+        <table><tr><td>Cell <span>Cell inline<div>Cell block</div></span></td></tr></table>
+        <div style="display:flex"><div>Item <span>Item inline<div>Item block</div></span></div></div>"#;
+    let pdf = smoke_html_to_pdf(html);
+    for text in ["Cell inline", "Cell block", "Item inline", "Item block"] {
+        assert!(pdf_has_text(&pdf, text), "missing {text:?}");
+    }
+}
+

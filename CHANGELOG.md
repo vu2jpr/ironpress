@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Fixed
+
+- A block-level box inside an inline box is laid out (CSS 2.1 § 9.2.1.1)
+  instead of being dropped with everything after it. `<div>a <span>b<div>c</div>
+  d</span></div>` lost `c`, and an unclosed `<span>` before a block, common in
+  HTML pasted from word processors, lost the rest of the document. Block
+  containers, table cells and flex items now break the inline box around the
+  block, as they already did at the root.
+
 ### Changed
 
 - Text shaping runs on harfrust and glyph outlines, bounds and advances come
