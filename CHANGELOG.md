@@ -16,6 +16,10 @@
   run collection, pagination, rendering) still run on the calling thread's
   stack, so very deep inline nesting can exhaust a small thread stack (about
   130 nested `<span>`s on a 2 MB thread).
+- Pagination no longer loops forever on a box whose split leaves a continuation
+  as tall as the box itself, such as a table row whose cell holds a line taller
+  than a page. It emitted empty pages until memory ran out; the box now
+  overflows its page as an unbreakable box (CSS Fragmentation 3 § 4.4).
 
 ### Changed
 

@@ -605,3 +605,37 @@ fn smoke_deeply_nested_content_is_laid_out() {
     assert!(pdf_has_text(&pdf, "Deepest text"));
     assert!(pdf_has_text(&pdf, "After nesting"));
 }
+
+#[test]
+fn smoke_unbreakable_table_row_taller_than_page_terminates() {
+    // The single line is taller than a page, so the row cannot be broken:
+    // it must overflow one page instead of being split into empty pages
+    // forever. A worker thread turns a regression into a failure, not a hang.
+    let html = "<table><tr><td><div style=\"line-height:780pt\">Tall line</div></td></tr></table>\
+                <p>After table</p>";
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = sender.send(smoke_html_to_pdf(html));
+    });
+    let pdf = receiver
+        .recv_timeout(std::time::Duration::from_secs(30))
+        .expect("pagination did not terminate");
+    assert!(pdf_has_text(&pdf, "Tall line"));
+    assert!(pdf_has_text(&pdf, "After table"));
+}
+
+#[test]
+fn smoke_split_that_moves_a_box_to_the_next_page_is_kept_below_the_page_top() {
+    // Only the empty first child fits below the spacer, so the split leaves a
+    // continuation as tall as the box. Lower on a page that is progress: the
+    // box continues on the next pages instead of overflowing this one.
+    let lines: String = (0..30).map(|i| format!("Line {i}<br>")).collect();
+    let html = format!(
+        "<style>@page {{ size: 200pt 150pt; margin: 0 }} * {{ margin: 0 }}</style>\
+         <div style=\"height:140pt\"></div>\
+         <div style=\"background:red\"><div style=\"height:0\"></div><p>{lines}</p></div>"
+    );
+    let pdf = smoke_html_to_pdf(&html);
+    assert!(pdf_page_count(&pdf) >= 4, "{} pages", pdf_page_count(&pdf));
+    assert!(pdf_has_text(&pdf, "Line 29"));
+}

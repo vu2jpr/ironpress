@@ -3402,6 +3402,19 @@ pub(crate) fn paginate_with_context(
             let split = split_element(&element, avail_below_box_top, FragmentBreakRule::Normal)
                 .or_else(|| {
                     split_element(&element, avail_below_box_top, FragmentBreakRule::Emergency)
+                })
+                // At the top of a page, a continuation as tall as the box
+                // consumed nothing: splitting it again on the next page would
+                // repeat forever. Such a box is unbreakable here and overflows
+                // its fragmentainer instead (CSS Fragmentation 3 § 4.4). Lower
+                // on a page the same split moves the box to the next page,
+                // where this check applies.
+                .filter(|(_, rest)| {
+                    !first_on_page
+                        || exceeds_with_roundoff(
+                            estimate_element_height(element.as_ref()),
+                            estimate_element_height(rest.as_ref()),
+                        )
                 });
             if let Some((first, rest)) = split {
                 // Place the first fragment at the (margin-adjusted) cursor; it
