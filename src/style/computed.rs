@@ -19030,11 +19030,7 @@ mod tests {
     fn make_keyword_rule(prop: &str, val: &str) -> CssRule {
         let mut map = StyleMap::new();
         map.set(prop, CssValue::Keyword(val.to_string()));
-        CssRule {
-            selector: "div".to_string(),
-            declarations: map,
-            pseudo_element: None,
-        }
+        CssRule::new("div".to_string(), map, None)
     }
 
     #[test]
@@ -21140,20 +21136,16 @@ mod tests {
     #[test]
     fn later_background_image_url_replaces_lower_gradient_atomically() {
         let parent = ComputedStyle::default();
-        let lower = CssRule {
-            selector: "div".to_string(),
-            declarations: crate::parser::css::parse_inline_style(
-                "background-image: linear-gradient(red, blue)",
-            ),
-            pseudo_element: None,
-        };
-        let higher = CssRule {
-            selector: "div".to_string(),
-            declarations: crate::parser::css::parse_inline_style(
-                "background-image: url(higher.png)",
-            ),
-            pseudo_element: None,
-        };
+        let lower = CssRule::new(
+            "div".to_string(),
+            crate::parser::css::parse_inline_style("background-image: linear-gradient(red, blue)"),
+            None,
+        );
+        let higher = CssRule::new(
+            "div".to_string(),
+            crate::parser::css::parse_inline_style("background-image: url(higher.png)"),
+            None,
+        );
         let style = compute_style_with_rules(
             HtmlTag::Div,
             None,
@@ -21171,20 +21163,16 @@ mod tests {
     #[test]
     fn later_background_image_gradient_replaces_lower_url_atomically() {
         let parent = ComputedStyle::default();
-        let lower = CssRule {
-            selector: "div".to_string(),
-            declarations: crate::parser::css::parse_inline_style(
-                "background-image: url(lower.png)",
-            ),
-            pseudo_element: None,
-        };
-        let higher = CssRule {
-            selector: "div".to_string(),
-            declarations: crate::parser::css::parse_inline_style(
-                "background-image: linear-gradient(red, blue)",
-            ),
-            pseudo_element: None,
-        };
+        let lower = CssRule::new(
+            "div".to_string(),
+            crate::parser::css::parse_inline_style("background-image: url(lower.png)"),
+            None,
+        );
+        let higher = CssRule::new(
+            "div".to_string(),
+            crate::parser::css::parse_inline_style("background-image: linear-gradient(red, blue)"),
+            None,
+        );
         let style = compute_style_with_rules(
             HtmlTag::Div,
             None,
@@ -21202,20 +21190,18 @@ mod tests {
     #[test]
     fn normal_background_image_cannot_replace_lower_important_image_list() {
         let parent = ComputedStyle::default();
-        let lower = CssRule {
-            selector: "div".to_string(),
-            declarations: crate::parser::css::parse_inline_style(
+        let lower = CssRule::new(
+            "div".to_string(),
+            crate::parser::css::parse_inline_style(
                 "background-image: linear-gradient(red, blue) !important",
             ),
-            pseudo_element: None,
-        };
-        let higher = CssRule {
-            selector: "div".to_string(),
-            declarations: crate::parser::css::parse_inline_style(
-                "background-image: url(normal.png)",
-            ),
-            pseudo_element: None,
-        };
+            None,
+        );
+        let higher = CssRule::new(
+            "div".to_string(),
+            crate::parser::css::parse_inline_style("background-image: url(normal.png)"),
+            None,
+        );
         let style = compute_style_with_rules(
             HtmlTag::Div,
             None,
@@ -21282,20 +21268,20 @@ mod tests {
     #[test]
     fn background_shorthand_resets_omitted_longhands_from_previous_rule() {
         let parent = ComputedStyle::default();
-        let prior_rule = CssRule {
-            selector: "div".to_string(),
-            declarations: crate::parser::css::parse_inline_style(
+        let prior_rule = CssRule::new(
+            "div".to_string(),
+            crate::parser::css::parse_inline_style(
                 "background-repeat: no-repeat; background-position: center; background-origin: content-box; background-size: cover; background-color: red",
             ),
-            pseudo_element: None,
-        };
-        let later_rule = CssRule {
-            selector: "div".to_string(),
-            declarations: crate::parser::css::parse_inline_style(
+            None,
+        );
+        let later_rule = CssRule::new(
+            "div".to_string(),
+            crate::parser::css::parse_inline_style(
                 r#"background: url("data:image/png;base64,AAAA")"#,
             ),
-            pseudo_element: None,
-        };
+            None,
+        );
         let style = compute_style_with_rules(
             HtmlTag::Div,
             None,
@@ -21316,18 +21302,18 @@ mod tests {
     #[test]
     fn later_background_initial_rule_resets_previous_background_state() {
         let parent = ComputedStyle::default();
-        let prior_rule = CssRule {
-            selector: "div".to_string(),
-            declarations: crate::parser::css::parse_inline_style(
+        let prior_rule = CssRule::new(
+            "div".to_string(),
+            crate::parser::css::parse_inline_style(
                 r#"background: url("data:image/png;base64,AAAA") no-repeat center / cover content-box"#,
             ),
-            pseudo_element: None,
-        };
-        let later_rule = CssRule {
-            selector: "div".to_string(),
-            declarations: crate::parser::css::parse_inline_style("background: initial"),
-            pseudo_element: None,
-        };
+            None,
+        );
+        let later_rule = CssRule::new(
+            "div".to_string(),
+            crate::parser::css::parse_inline_style("background: initial"),
+            None,
+        );
         let style = compute_style_with_rules(
             HtmlTag::Div,
             None,
@@ -21365,18 +21351,18 @@ mod tests {
             r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>"#,
         );
 
-        let prior_rule = CssRule {
-            selector: "div".to_string(),
-            declarations: crate::parser::css::parse_inline_style(
+        let prior_rule = CssRule::new(
+            "div".to_string(),
+            crate::parser::css::parse_inline_style(
                 r#"background: url("data:image/png;base64,AAAA") no-repeat center / cover content-box"#,
             ),
-            pseudo_element: None,
-        };
-        let later_rule = CssRule {
-            selector: "div".to_string(),
-            declarations: crate::parser::css::parse_inline_style("background: inherit"),
-            pseudo_element: None,
-        };
+            None,
+        );
+        let later_rule = CssRule::new(
+            "div".to_string(),
+            crate::parser::css::parse_inline_style("background: inherit"),
+            None,
+        );
         let style = compute_style_with_rules(
             HtmlTag::Div,
             None,

@@ -293,9 +293,34 @@ pub struct CssRule {
     pub declarations: StyleMap,
     /// If this rule targets a `::before` or `::after` pseudo-element.
     pub pseudo_element: Option<PseudoElement>,
+    /// Whether the selector contains `:has()`, decided once from the selector
+    /// text so matching never rescans it.
+    uses_has: bool,
 }
 
 impl CssRule {
+    pub(crate) fn new(
+        selector: String,
+        declarations: StyleMap,
+        pseudo_element: Option<PseudoElement>,
+    ) -> Self {
+        let uses_has = selector
+            .as_bytes()
+            .windows(b":has(".len())
+            .any(|window| window.eq_ignore_ascii_case(b":has("));
+        Self {
+            selector,
+            declarations,
+            pseudo_element,
+            uses_has,
+        }
+    }
+
+    /// Whether the selector contains the relational `:has()` pseudo-class.
+    pub(crate) const fn uses_has(&self) -> bool {
+        self.uses_has
+    }
+
     pub(crate) fn counter_style_name(&self) -> Option<&str> {
         const AT_RULE: &str = "@counter-style";
         let selector = self.selector.trim();

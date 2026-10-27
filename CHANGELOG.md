@@ -37,6 +37,8 @@
   content at every page break, and no longer searches all of it for forced
   breaks when the document has none. Both made long, deeply nested documents
   quadratic in their page count.
+- The class lists `:has()` matching reads are gathered only when a style sheet
+  uses `:has()`. Gathering them walked the subtree of every element.
 
 ### Changed
 

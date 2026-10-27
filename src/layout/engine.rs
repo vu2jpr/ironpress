@@ -2003,7 +2003,7 @@ fn first_root_child_margin_top(
                     el.tag_name(),
                     &class_refs,
                     el.id(),
-                    &selector_attributes_with_has(el),
+                    &selector_attributes_with_has(el, rules),
                     &selector_ctx,
                 );
                 return style.margin.top;
@@ -3489,7 +3489,7 @@ fn flatten_element_in_frame(
         following_siblings: following_siblings.to_vec(),
         is_empty: element_is_empty(el),
     };
-    let selector_attrs = selector_attributes_with_has(el);
+    let selector_attrs = selector_attributes_with_has(el, env.rules);
     let mut style = compute_style_with_context_and_percentage_basis_with_font_metrics(
         el.tag,
         el.style_attr(),

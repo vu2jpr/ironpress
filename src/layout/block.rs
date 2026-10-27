@@ -343,7 +343,7 @@ fn has_direct_table_cell_child(
             child.tag_name(),
             &classes,
             child.id(),
-            &selector_attributes_with_has(child),
+            &selector_attributes_with_has(child, rules),
             &SelectorContext {
                 ancestors: ancestors.to_vec(),
                 child_index,
@@ -2037,7 +2037,7 @@ pub(crate) fn layout_block_element(
                         child_el.tag_name(),
                         &cls_refs,
                         child_el.id(),
-                        &selector_attributes_with_has(child_el),
+                        &selector_attributes_with_has(child_el, env.rules),
                         &child_selector_ctx,
                         env.font_metrics(),
                     );
