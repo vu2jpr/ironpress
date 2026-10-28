@@ -740,10 +740,18 @@ impl FontSizeAdjust {
     }
 
     /// Resolve the CSS Fonts used font size for one selected face.
-    pub fn used_font_size(self, computed_font_size: f32, actual_aspect: f32) -> f32 {
+    ///
+    /// The face's actual aspect is measured only when an adjustment applies:
+    /// measuring it hints the face's outlines.
+    pub fn used_font_size(
+        self,
+        computed_font_size: f32,
+        actual_aspect: impl FnOnce() -> f32,
+    ) -> f32 {
         let Some(target_aspect) = self.target_ex_height() else {
             return computed_font_size;
         };
+        let actual_aspect = actual_aspect();
         if !computed_font_size.is_finite()
             || !target_aspect.is_finite()
             || !actual_aspect.is_finite()

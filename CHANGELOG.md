@@ -39,6 +39,8 @@
   quadratic in their page count.
 - The class lists `:has()` matching reads are gathered only when a style sheet
   uses `:has()`. Gathering them walked the subtree of every element.
+- A text run measures its face's x-height only when `font-size-adjust` applies.
+  Every run measured it, and each measurement hints the face's outlines.
 
 ### Changed
 
