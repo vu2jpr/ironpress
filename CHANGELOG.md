@@ -49,6 +49,9 @@
 - Selector contexts borrow their siblings' names from one list per parent
   instead of copying them for every element and every ancestor, which was
   quadratic in both nesting depth and sibling count.
+- A font compiles its shape plans for Latin and script-neutral text with
+  default features once, when it is loaded. Every run compiled its own plan,
+  collecting and sorting the font's lookups.
 
 ### Changed
 
