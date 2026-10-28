@@ -135,6 +135,37 @@ pub enum CssValue {
     BackgroundLayers(Vec<BackgroundLayerSource>),
 }
 
+impl CssValue {
+    /// Whether resolving this value may need the font's measured `ex` or
+    /// `ch`. Conservative: math, unsubstituted references and background
+    /// layers may hold either unit, and so may raw text kept for later
+    /// parsing, counted whenever it contains either unit's letters.
+    pub(crate) fn may_use_font_metric_units(&self) -> bool {
+        match self {
+            Self::Ex(_)
+            | Self::Ch(_)
+            | Self::Math(_)
+            | Self::PendingMath(_)
+            | Self::Var(..)
+            | Self::BackgroundLayers(_) => true,
+            Self::Keyword(text) => {
+                let text = text.to_ascii_lowercase();
+                text.contains("ex") || text.contains("ch")
+            }
+            Self::Length(_)
+            | Self::Em(_)
+            | Self::Color(_)
+            | Self::Number(_)
+            | Self::Percentage(_)
+            | Self::Rem(_)
+            | Self::Vw(_)
+            | Self::Vh(_)
+            | Self::Vmin(_)
+            | Self::Vmax(_) => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum BackgroundLayerSource {
     Raster(String),
@@ -160,6 +191,14 @@ pub struct StyleMap {
 impl StyleMap {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Whether any declaration may resolve a length against the font's
+    /// measured metrics (`ex`, `ch`); see [`CssValue::may_use_font_metric_units`].
+    pub(crate) fn may_use_font_metric_units(&self) -> bool {
+        self.properties
+            .values()
+            .any(CssValue::may_use_font_metric_units)
     }
 
     pub fn set(&mut self, key: &str, value: CssValue) {

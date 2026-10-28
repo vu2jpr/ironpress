@@ -41,6 +41,11 @@
   uses `:has()`. Gathering them walked the subtree of every element.
 - A text run measures its face's x-height only when `font-size-adjust` applies.
   Every run measured it, and each measurement hints the face's outlines.
+- Style resolution measures `ex` and `ch` only for declarations that can use
+  them, and a computed style keeps what it measured with the font it belongs
+  to, so a child selecting the same font reuses it. Every style selected and
+  hinted its face several times, which dominated layout time on long
+  documents.
 
 ### Changed
 
