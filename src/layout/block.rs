@@ -348,8 +348,8 @@ fn has_direct_table_cell_child(
                 ancestors: ancestors.to_vec(),
                 child_index,
                 sibling_count,
-                preceding_siblings: siblings[..child_index].to_vec(),
-                following_siblings: siblings[child_index + 1..].to_vec(),
+                preceding_siblings: siblings[..child_index].into(),
+                following_siblings: siblings[child_index + 1..].into(),
                 is_empty: element_is_empty(child),
             },
             font_metrics,
@@ -774,11 +774,11 @@ pub(crate) fn layout_block_element(
     let has_inflow_block_pseudo = has_block_before || has_block_after;
     let inline_sequence =
         InlineContentSequence::with_generated(&el.children, generated_styles.boxes(el));
+    let child_sibling_list = element_sibling_list(&el.children);
     let inline_children =
         InlineFormattingContext::new(style, env.rules, child_ancestors, env.font_metrics())
-            .children(inline_sequence);
+            .children(inline_sequence, &child_sibling_list);
     let has_out_of_flow_children = inline_children.has_out_of_flow();
-    let child_sibling_list = element_sibling_list(&el.children);
     let child_el_count = child_sibling_list.len();
     let has_blended_block_child = inline_children.iter().any(|child| {
         child.style.mix_blend_mode != crate::style::computed::BlendMode::Normal
@@ -1211,8 +1211,10 @@ pub(crate) fn layout_block_element(
                             .for_element(
                                 ElementSiblingContext::new(child_el_idx, child_el_count)
                                     .with_neighbors(
-                                        &child_sibling_list[..child_el_idx],
-                                        forward_siblings(&child_sibling_list, child_el_idx),
+                                        child_sibling_list.get(..child_el_idx).unwrap_or_default(),
+                                        child_sibling_list
+                                            .get(child_el_idx + 1..)
+                                            .unwrap_or_default(),
                                     ),
                             ),
                             target,

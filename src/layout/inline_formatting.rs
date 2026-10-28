@@ -1,4 +1,4 @@
-use crate::parser::css::{AncestorInfo, CssRule, PseudoElement, SelectorContext};
+use crate::parser::css::{AncestorInfo, CssRule, PseudoElement, SelectorContext, SiblingNames};
 use crate::parser::dom::{DomNode, ElementNode, HtmlTag};
 use crate::parser::ttf::TtfFont;
 use crate::style::computed::{
@@ -10,8 +10,7 @@ use std::collections::HashMap;
 
 use super::elements::{BoxModel, IntoLayoutNode, LayoutNode, TextBlock};
 use super::engine::{
-    CounterState, ElementSiblingPosition, TextRun, element_is_empty, element_sibling_list,
-    forward_siblings,
+    CounterState, ElementSiblingContext, TextRun, element_is_empty, element_sibling_list,
 };
 use super::helpers::{append_pseudo_inline_run, build_pseudo_inline_run};
 use super::text::{
@@ -28,13 +27,13 @@ pub(crate) use flow::{IndependentFlowLayout, layout_mixed_flow_children};
 /// `:first-of-type`, `:last-of-type`, sibling combinators, `:empty`, and the
 /// ancestor metadata used by descendant selectors identical at every depth.
 pub(crate) struct InlineSiblingCursor {
-    siblings: Vec<(String, Vec<String>)>,
+    siblings: SiblingNames<'static>,
     next_index: usize,
 }
 
 impl InlineSiblingCursor {
     pub(crate) fn starting_at(nodes: &[DomNode], next_index: usize) -> Self {
-        let siblings = element_sibling_list(nodes);
+        let siblings = SiblingNames::from(element_sibling_list(nodes));
         Self {
             next_index: next_index.min(siblings.len()),
             siblings,
@@ -42,7 +41,7 @@ impl InlineSiblingCursor {
     }
 
     pub(crate) fn next_context<'a>(
-        &mut self,
+        &'a mut self,
         element: &'a ElementNode,
         ancestors: &[AncestorInfo<'a>],
     ) -> SelectorContext<'a> {
@@ -52,12 +51,8 @@ impl InlineSiblingCursor {
             ancestors: ancestors.to_vec(),
             child_index,
             sibling_count: self.siblings.len(),
-            preceding_siblings: self
-                .siblings
-                .get(..child_index)
-                .unwrap_or_default()
-                .to_vec(),
-            following_siblings: forward_siblings(&self.siblings, child_index).to_vec(),
+            preceding_siblings: self.siblings.window(..child_index),
+            following_siblings: self.siblings.window(child_index.saturating_add(1)..),
             is_empty: element_is_empty(element),
         }
     }
@@ -566,28 +561,30 @@ impl AtomicInlineEmission {
 }
 
 /// Computed participation of one element child in an inline formatting context.
-pub(crate) struct InlineFormattingChild {
+pub(crate) struct InlineFormattingChild<'siblings> {
     pub(crate) style: ComputedStyle,
     pub(crate) role: InlineFormattingRole,
-    source: ElementSiblingPosition,
+    source: ElementSiblingContext<'siblings>,
 }
 
-impl InlineFormattingChild {
-    pub(crate) const fn source(&self) -> &ElementSiblingPosition {
-        &self.source
+impl<'siblings> InlineFormattingChild<'siblings> {
+    /// The child's position among its parent's element children, borrowing
+    /// the parent's sibling list.
+    pub(crate) const fn source(&self) -> ElementSiblingContext<'siblings> {
+        self.source
     }
 }
 
 /// One authoritative style/classification pass for an inline sibling sequence.
 /// Indices are element-sibling indices, never raw DOM-node indices.
-pub(crate) struct InlineFormattingChildren(Vec<InlineFormattingChild>);
+pub(crate) struct InlineFormattingChildren<'siblings>(Vec<InlineFormattingChild<'siblings>>);
 
-impl InlineFormattingChildren {
-    pub(crate) fn get(&self, element_index: usize) -> Option<&InlineFormattingChild> {
+impl<'siblings> InlineFormattingChildren<'siblings> {
+    pub(crate) fn get(&self, element_index: usize) -> Option<&InlineFormattingChild<'siblings>> {
         self.0.get(element_index)
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &InlineFormattingChild> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &InlineFormattingChild<'siblings>> {
         self.0.iter()
     }
 
@@ -807,11 +804,15 @@ impl<'a> InlineFormattingContext<'a> {
         )
     }
 
-    pub(crate) fn children(&self, sequence: InlineContentSequence<'_>) -> InlineFormattingChildren {
-        let mut siblings = InlineSiblingCursor::starting_at(
-            sequence.source_nodes(),
-            sequence.starting_element_index(),
-        );
+    /// Style and classify the element children of `sequence`. `siblings` is
+    /// the element-sibling list of the sequence's source nodes
+    /// ([`element_sibling_list`]); every child's position borrows it.
+    pub(crate) fn children<'siblings>(
+        &self,
+        sequence: InlineContentSequence<'_>,
+        siblings: &'siblings [(String, Vec<String>)],
+    ) -> InlineFormattingChildren<'siblings> {
+        let mut child_index = sequence.starting_element_index().min(siblings.len());
         let roles = sequence
             .nodes()
             .iter()
@@ -819,7 +820,16 @@ impl<'a> InlineFormattingContext<'a> {
                 let DomNode::Element(element) = node else {
                     return None;
                 };
-                let selector_context = siblings.next_context(element, self.ancestors);
+                let source = ElementSiblingContext::new(child_index, siblings.len())
+                    .with_neighbors(
+                        siblings.get(..child_index).unwrap_or_default(),
+                        siblings
+                            .get(child_index.saturating_add(1)..)
+                            .unwrap_or_default(),
+                    );
+                child_index = child_index.saturating_add(1);
+                let selector_context =
+                    source.selector_context(self.ancestors, element_is_empty(element));
                 let classes = element.class_list();
                 let style = compute_style_with_context_with_font_metrics(
                     element.tag,
@@ -836,7 +846,7 @@ impl<'a> InlineFormattingContext<'a> {
                 Some(InlineFormattingChild {
                     role: self.role(element, &style, &selector_context),
                     style,
-                    source: ElementSiblingPosition::from_selector_context(&selector_context),
+                    source,
                 })
             })
             .collect();

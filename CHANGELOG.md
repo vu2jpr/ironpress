@@ -46,6 +46,9 @@
   to, so a child selecting the same font reuses it. Every style selected and
   hinted its face several times, which dominated layout time on long
   documents.
+- Selector contexts borrow their siblings' names from one list per parent
+  instead of copying them for every element and every ancestor, which was
+  quadratic in both nesting depth and sibling count.
 
 ### Changed
 

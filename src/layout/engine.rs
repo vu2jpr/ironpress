@@ -1,6 +1,6 @@
 use crate::parser::css::{
     AncestorInfo, CssRule, PageRule, PageSelector, PageSelectorContext, PageTextStyle,
-    PseudoElement, SelectorContext,
+    PseudoElement, SelectorContext, SiblingNames,
 };
 use crate::parser::dom::{DomNode, ElementNode, HtmlTag};
 use crate::parser::ttf::TtfFont;
@@ -2651,8 +2651,8 @@ fn direct_flex_item_filters(
             ancestors: ancestors.to_vec(),
             child_index: idx,
             sibling_count: child_count,
-            preceding_siblings: Vec::new(),
-            following_siblings: Vec::new(),
+            preceding_siblings: Default::default(),
+            following_siblings: Default::default(),
             is_empty: false,
         };
         let mut child_style = compute_style_with_context_with_font_metrics(
@@ -3056,8 +3056,7 @@ pub(crate) fn flatten_nodes(
             .environment_aware_atomic_layout_segments(inline_sequence);
     let mut atomic_inline_segments = atomic_inline_segments.into_iter().peekable();
     let mut element_index = 0;
-    let mut preceding_siblings: Vec<(String, Vec<String>)> = Vec::new();
-    let all_element_siblings = element_sibling_list(nodes);
+    let all_element_siblings = SiblingNames::from(element_sibling_list(nodes));
 
     // Accumulator for consecutive inline-block elements
     let mut ib_group: Vec<(&ElementNode, bool)> = Vec::new();
@@ -3152,19 +3151,11 @@ pub(crate) fn flatten_nodes(
                 ancestors,
                 env,
             ) {
-                for segment_node in segment.nodes() {
-                    if let DomNode::Element(element) = segment_node {
-                        preceding_siblings.push((
-                            element.tag_name().to_string(),
-                            element
-                                .class_list()
-                                .iter()
-                                .map(|class| class.to_string())
-                                .collect(),
-                        ));
-                        element_index += 1;
-                    }
-                }
+                element_index += segment
+                    .nodes()
+                    .iter()
+                    .filter(|node| matches!(node, DomNode::Element(_)))
+                    .count();
                 node_index = segment.end();
                 atomic_inline_segments.next();
                 continue;
@@ -3256,9 +3247,8 @@ pub(crate) fn flatten_nodes(
                     ancestors: ancestors.to_vec(),
                     child_index: element_index,
                     sibling_count: element_count,
-                    preceding_siblings: preceding_siblings.to_vec(),
-                    following_siblings: forward_siblings(&all_element_siblings, element_index)
-                        .to_vec(),
+                    preceding_siblings: all_element_siblings.window(..element_index),
+                    following_siblings: all_element_siblings.window(element_index + 1..),
                     is_empty: element_is_empty(el),
                 };
                 let style = compute_style_with_context_with_font_metrics(
@@ -3298,7 +3288,9 @@ pub(crate) fn flatten_nodes(
                         .for_element(
                             ElementSiblingContext::new(element_index, element_count)
                                 .with_neighbors(
-                                    &preceding_siblings,
+                                    all_element_siblings
+                                        .get(..element_index)
+                                        .unwrap_or_default(),
                                     forward_siblings(&all_element_siblings, element_index),
                                 ),
                         );
@@ -3354,19 +3346,18 @@ pub(crate) fn flatten_nodes(
                             .for_element(
                                 ElementSiblingContext::new(element_index, element_count)
                                     .with_neighbors(
-                                        &preceding_siblings,
-                                        forward_siblings(&all_element_siblings, element_index),
+                                        all_element_siblings
+                                            .get(..element_index)
+                                            .unwrap_or_default(),
+                                        all_element_siblings
+                                            .get(element_index + 1..)
+                                            .unwrap_or_default(),
                                     ),
                             ),
                         output,
                         env,
                     );
                 }
-                // Track this element as a preceding sibling for the next element
-                preceding_siblings.push((
-                    el.tag_name().to_string(),
-                    el.class_list().iter().map(|s| s.to_string()).collect(),
-                ));
                 element_index += 1;
             }
         }
@@ -3475,8 +3466,8 @@ fn flatten_element_in_frame(
     let positioned_ancestor_depth = tree.positioned_ancestor_depth();
     let child_index = siblings.child_index();
     let sibling_count = siblings.sibling_count();
-    let preceding_siblings = siblings.preceding();
-    let following_siblings = siblings.following();
+    let preceding_siblings = siblings.preceding_names();
+    let following_siblings = siblings.following_names();
     let filter_application = context.filter_application();
     let available_width = ctx.available_width();
     let available_height = ctx.available_height();
@@ -3485,8 +3476,8 @@ fn flatten_element_in_frame(
         ancestors: ancestors.to_vec(),
         child_index,
         sibling_count,
-        preceding_siblings: preceding_siblings.to_vec(),
-        following_siblings: following_siblings.to_vec(),
+        preceding_siblings: preceding_siblings.clone(),
+        following_siblings,
         is_empty: element_is_empty(el),
     };
     let selector_attrs = selector_attributes_with_has(el, env.rules);
@@ -3974,8 +3965,8 @@ fn flatten_element_in_frame(
             element: el,
             child_index,
             sibling_count,
-            preceding_siblings: Vec::new(),
-            following_siblings: Vec::new(),
+            preceding_siblings: Default::default(),
+            following_siblings: Default::default(),
             is_empty: false,
         });
 
@@ -4150,8 +4141,8 @@ fn flatten_element_in_frame(
                 ancestors: ancestors.to_vec(),
                 child_index,
                 sibling_count,
-                preceding_siblings: preceding_siblings.to_vec(),
-                following_siblings: Vec::new(),
+                preceding_siblings: preceding_siblings.clone(),
+                following_siblings: Default::default(),
                 is_empty: false,
             };
             let generated_styles =
@@ -4718,8 +4709,8 @@ fn inline_loose_list_p(
                     ancestors: child_ancestors.to_vec(),
                     child_index: child_el_ordinal,
                     sibling_count: li_child_el_count,
-                    preceding_siblings: Vec::new(),
-                    following_siblings: Vec::new(),
+                    preceding_siblings: Default::default(),
+                    following_siblings: Default::default(),
                     is_empty: false,
                 };
                 let p_style = compute_style_with_context_with_font_metrics(
@@ -4941,10 +4932,9 @@ fn flex_element_with_display_contents_children(
     ancestors: &[AncestorInfo],
     env: &LayoutEnv,
 ) -> Option<ElementNode> {
-    let sibling_list = element_sibling_list(&el.children);
+    let sibling_list = SiblingNames::from(element_sibling_list(&el.children));
     let element_count = sibling_list.len();
     let mut element_index = 0usize;
-    let mut preceding_siblings: Vec<(String, Vec<String>)> = Vec::new();
     let mut changed = false;
     let mut children = Vec::with_capacity(el.children.len());
 
@@ -4955,8 +4945,8 @@ fn flex_element_with_display_contents_children(
                     ancestors: ancestors.to_vec(),
                     child_index: element_index,
                     sibling_count: element_count,
-                    preceding_siblings: preceding_siblings.clone(),
-                    following_siblings: forward_siblings(&sibling_list, element_index).to_vec(),
+                    preceding_siblings: sibling_list.window(..element_index),
+                    following_siblings: sibling_list.window(element_index + 1..),
                     is_empty: element_is_empty(child_el),
                 };
                 if authored_display_contents(child_el, env.rules, ancestors, &selector_ctx) {
@@ -4965,14 +4955,6 @@ fn flex_element_with_display_contents_children(
                 } else {
                     children.push(child.clone());
                 }
-                preceding_siblings.push((
-                    child_el.tag_name().to_string(),
-                    child_el
-                        .class_list()
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect(),
-                ));
                 element_index += 1;
             }
             DomNode::Text(_) => children.push(child.clone()),

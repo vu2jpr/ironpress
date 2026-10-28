@@ -1,5 +1,5 @@
 use crate::layout::context::LayoutEnv;
-use crate::layout::engine::TextRun;
+use crate::layout::engine::{TextRun, element_sibling_list};
 use crate::layout::text::{InlineRunCollector, InlineRunContext};
 use crate::parser::css::AncestorInfo;
 use crate::parser::dom::{DomNode, ElementNode};
@@ -43,9 +43,10 @@ pub(crate) fn layout_mixed_flow_children<'dom>(
     independent_layout: &mut impl IndependentFlowLayout,
 ) {
     let sequence = InlineContentSequence::new(nodes);
+    let siblings = element_sibling_list(nodes);
     let children =
         InlineFormattingContext::new(parent_style, env.rules, ancestors, env.font_metrics())
-            .children(sequence);
+            .children(sequence, &siblings);
     let mut element_index = 0;
     let run_context = independent_layout.inline_run_context();
 
