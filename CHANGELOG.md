@@ -26,6 +26,10 @@
   its column's minimum. A Word table of such cells grew many times wider than
   declared, and print fitting then shrank every page of the document to fit
   it, to 11% in one case.
+- A box taller than a page now breaks before itself when none of its break
+  points fits in the space left on the page, instead of forcing its first
+  child into that space. A table caption landing in the last few points of a
+  page was clipped at the page edge.
 
 ### Changed
 
