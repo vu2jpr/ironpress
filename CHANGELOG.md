@@ -20,6 +20,12 @@
   as tall as the box itself, such as a table row whose cell holds a line taller
   than a page. It emitted empty pages until memory ran out; the box now
   overflows its page as an unbreakable box (CSS Fragmentation 3 § 4.4).
+- Table column sizing no longer takes a block's margin-narrowed width as a
+  width the block asks for. Cells are measured at the table's width, so a
+  `<p style="margin-left:4.5pt">` in a cell claimed nearly the whole table as
+  its column's minimum. A Word table of such cells grew many times wider than
+  declared, and print fitting then shrank every page of the document to fit
+  it, to 11% in one case.
 
 ### Changed
 
